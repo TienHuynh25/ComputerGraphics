@@ -1,5 +1,6 @@
 // GLOBAL CONSTANTS
-
+final int CYLINDER_HEIGHT = 300;
+final int CYLINDER_RADIUS = 200;
 final int NUM_DIMENSIONS = 3;
 
 // when you store (r,g,b) values in an array,

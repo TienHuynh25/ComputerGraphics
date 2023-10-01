@@ -22,24 +22,18 @@ void setup() {
 
   buffer = createGraphics(600, 600);
     
-  PVector[] vertices = new PVector[Triangle.NUM_VERTICES];
-  PVector[] vertexNormals = new PVector[Triangle.NUM_VERTICES];
-  
+  PVector[] vertices = new PVector[Triangle.NUM_VERTICES]; 
   vertices[1] = new PVector(10, 50,30);
-  vertices[0] = new PVector(-100, 200,30);
-  vertices[2] = new PVector(-250, 100,30);
-  vertexNormals[0] = crossProduct(vertices[0],vertices[1]).normalize();
-  vertexNormals[1] = crossProduct(vertices[0],vertices[1]).normalize();
-  vertexNormals[2] = crossProduct(vertices[0],vertices[1]).normalize();
-  
+  vertices[2] = new PVector(-100, 200,30);
+  vertices[0] = new PVector(-250, 100,30);
+ 
   singleTriangle = new Triangle[1]; // change this line
-  singleTriangle[0] = new Triangle(vertices, vertexNormals);
-  
-  
+  singleTriangle[0] = new Triangle(vertices);
   rotatedSingleTriangle = copyTriangleList(singleTriangle);
-  cylinderList = new Triangle[]{}; // change this line
+  
+  
+  cylinderList = genTri(10,20);
   rotatedCylinderList = copyTriangleList(cylinderList);
-
   printSettings();
 }
 
@@ -110,6 +104,7 @@ void draw2DTriangle(Triangle t) {
   
   vertices = projectTriangle(t);
   if(vertices ==  null){return;}
+  if(!backFaceCull(t)){return;}
   
   setColor(BLUE);
   bresenhamLine(int(vertices[0].x),int(vertices[0].y),int(vertices[1].x), int(vertices[1].y));
@@ -118,8 +113,15 @@ void draw2DTriangle(Triangle t) {
   if(doNormals){drawNormals(t);}
 }
 
-void backFaceCull(){
-  return;
+boolean backFaceCull(Triangle t){
+  PVector[] vertices2d = new PVector[Triangle.NUM_VERTICES];
+  
+  vertices2d = projectTriangle(t);
+  if(vertices2d ==  null){return false;}
+  Triangle triangle = new Triangle(vertices2d);
+  if(crossProduct(triangle.edges[0],triangle.edges[1]).z == 0){ return false;}
+  if(isFront(triangle.vertexNormals[0]) == false){return false;}
+  return true;
 }
 
 /*
@@ -131,17 +133,37 @@ final float[] VERTEX_NORMAL_COLOR = {1f, 1f, 0f}; // yellow
 
 void drawNormals(Triangle t) {
   PVector[] vertices = new PVector[Triangle.NUM_VERTICES];
+  
+  PVector centerNormal = avgVec(t.vertexNormals[0],t.vertexNormals[1],t.vertexNormals[2]).normalize();
+  PVector centerStart = avgVec(t.vertices[0],t.vertices[1],t.vertices[2]);
+  
+  print("\nnormals 1"+t.vertexNormals[0].x,t.vertexNormals[0].y,t.vertexNormals[0].z);
+  print("\nnormals 2"+t.vertexNormals[1].x,t.vertexNormals[1].y,t.vertexNormals[1].z);
+  print("\nnormals 3"+t.vertexNormals[2].x,t.vertexNormals[2].y,t.vertexNormals[2].z);
+  print("\nnormals"+centerNormal.x,centerNormal.y,centerNormal.z);
+  
+  PVector v1Point = t.vertices[0].copy();
+  v1Point = v1Point.add(t.vertexNormals[0].mult(NORMAL_LENGTH));
+  
+  PVector v2Point = t.vertices[1].copy();
+  v2Point = v2Point.add(t.vertexNormals[1].mult(NORMAL_LENGTH));
+  
+  PVector v3Point = t.vertices[2].copy();
+  v3Point = v3Point.add(t.vertexNormals[2].mult(NORMAL_LENGTH));
+  
+  PVector centerEnd = centerStart.copy();
+  centerEnd = centerEnd.add(centerNormal.mult(NORMAL_LENGTH));
+  
+  print("\nstartpoints: "+ t.vertices[0].x,t.vertices[0].y,t.vertices[0].z);
+  print("\nendpoints: "+v1Point.x,v1Point.y,v1Point.z);
+  
   vertices = projectTriangle(t);
-  
-  PVector centerNormal = avgNormal(t.vertexNormals[0],t.vertexNormals[1],t.vertexNormals[2]);
-  print("normals"+centerNormal.x,centerNormal.y,centerNormal.z);
-  PVector v1Point = t.vertices[0].add(centerNormal.mult(NORMAL_LENGTH));
-  PVector v2Point = t.vertices[1].add(centerNormal.mult(NORMAL_LENGTH));
-  PVector v3Point = t.vertices[2].add(centerNormal.mult(NORMAL_LENGTH));
-  
   v1Point = projectVertex(v1Point);
   v2Point = projectVertex(v2Point);
   v3Point = projectVertex(v3Point);
+  centerStart = projectVertex(centerStart);
+  centerEnd = projectVertex(centerEnd);
+  
   print("point: "+vertices[0].x,vertices[0].y,v1Point.x,v1Point.y);
   if(v1Point == null || v2Point == null || v3Point == null){print("null normals");return;}
   
@@ -149,6 +171,84 @@ void drawNormals(Triangle t) {
   bresenhamLine(int(vertices[0].x),int(vertices[0].y),int(v1Point.x), int(v1Point.y));
   bresenhamLine(int(vertices[1].x),int(vertices[1].y),int(v2Point.x), int(v2Point.y));
   bresenhamLine(int(vertices[2].x),int(vertices[2].y),int(v3Point.x), int(v3Point.y));
+  bresenhamLine(int(centerStart.x),int(centerStart.y),int(centerEnd.x), int(centerEnd.y));
+}
+
+PVector[][] genPoints(int nbInY, int nbInTheta){
+  float theta = 0f;
+  PVector[][] indices = new PVector[nbInY+1][nbInTheta+1];
+  float y = CYLINDER_HEIGHT;
+  
+  for(int j=0; j<=nbInY; j++){
+    y = (CYLINDER_HEIGHT/2) - j*(CYLINDER_HEIGHT/nbInY);    
+    indices[j][0] = new PVector(0,y,0);
+    
+    for (int i=0; i<(nbInTheta); i++) {
+      theta = TWO_PI*i/nbInTheta;
+      indices[j][i+1] = new PVector(CYLINDER_RADIUS*sin(theta), y, CYLINDER_RADIUS*cos(theta));
+    }
+  }
+  
+  return indices;
+}
+
+Triangle[] genTri(int nbInY, int nbInTheta) {
+  PVector[][] indices = genPoints(nbInY, nbInTheta);
+  int total = ( (nbInY+1) * (nbInTheta+1) * 2) + 2 * (nbInTheta+1)+ nbInY+1;
+  Triangle[] triangles = new Triangle[total];
+  int current = 0;
+
+  // fill top endcap
+  for (int i = 0; i <= nbInTheta; i++) {
+    PVector[] vertices = new PVector[Triangle.NUM_VERTICES];
+    vertices[0] = indices[0][0].copy();
+    vertices[2] = indices[0][(i + 1) % nbInTheta].copy(); // Wrap around for the last point
+    vertices[1] = indices[0][i].copy();
+    triangles[current] = new Triangle(vertices);
+    current++;
+  }
+
+  // fill bottom endcap
+  for (int i = 0; i <= nbInTheta; i++) {
+    PVector[] vertices = new PVector[Triangle.NUM_VERTICES];
+    vertices[0] = indices[nbInY][0].copy();
+    vertices[1] = indices[nbInY][(i + 1) % nbInTheta].copy(); // Wrap around for the last point
+    vertices[2] = indices[nbInY][i].copy();
+    triangles[current] = new Triangle(vertices);
+    current++;
+  }
+  
+  //fill last slides
+  for (int j = 0; j <= nbInY; j++) {
+      // Add an additional triangle to complete the bottom endcap
+    PVector[] bottomVertices = new PVector[Triangle.NUM_VERTICES];
+    bottomVertices[0] = indices[j][nbInTheta].copy();
+    bottomVertices[1] = indices[j][0].copy();
+    bottomVertices[2] = indices[j][(nbInTheta - 1) % nbInTheta].copy();
+    triangles[current] = new Triangle(bottomVertices);
+    current++;  
+  }
+
+  // fill side
+  for (int j = 0; j <= nbInY; j++) {
+    for (int i = 0; i <= nbInTheta; i++) {
+      PVector[] vertices = new PVector[Triangle.NUM_VERTICES];
+      vertices[0] = indices[j][i].copy();
+      vertices[1] = indices[(j + 1) % (nbInY + 1)][(i + 1) % nbInTheta].copy(); // Wrap around for the last point
+      vertices[2] = indices[j][(i + 1) % nbInTheta].copy();
+      triangles[current] = new Triangle(vertices);
+      current++;
+
+      vertices[0] = indices[j][i].copy();
+      vertices[1] = indices[(j + 1) % (nbInY + 1)][i].copy();
+      vertices[2] = indices[(j + 1) % (nbInY + 1)][(i + 1) % nbInTheta].copy(); // Wrap around for the last point
+      triangles[current] = new Triangle(vertices);
+      current++;
+    }
+  }
+  
+
+  return triangles;
 }
 
 /*

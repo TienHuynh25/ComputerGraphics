@@ -3,6 +3,7 @@ class Triangle {
 
   PVector[] vertices = new PVector[NUM_VERTICES];
   PVector[] vertexNormals = new PVector[NUM_VERTICES];
+  PVector[] edges = new PVector[NUM_VERTICES];
 
   Triangle(PVector[] vertices, PVector[] normals) {
     for (int j=0; j<NUM_VERTICES; j++) {
@@ -10,12 +11,34 @@ class Triangle {
       this.vertexNormals[j] = normals[j].copy();
       this.vertexNormals[j].normalize();
     }
-    updateAll();
+    updateAll(true);
+  }
+  
+  Triangle(PVector[] vertices) {
+    for (int j=0; j<NUM_VERTICES; j++) {
+      this.vertices[j] = vertices[j].copy();
+    }
+    updateAll(false);
   }
 
   // if triangle vertices and/or vertex normals change, update remaining data
-  void updateAll() {
-    //need changes here
+  void updateAll(boolean normal) {
+    calEdge();
+    if(normal == false){
+      this.vertexNormals[0] = findNormals(this.edges[0],this.edges[1]).copy();
+      this.vertexNormals[1] = findNormals(this.edges[0],this.edges[1]).copy();
+      this.vertexNormals[2] = findNormals(this.edges[0],this.edges[1]).copy();
+    }
+  }
+  
+  PVector findNormals(PVector v1, PVector v2){
+    return crossProduct(v1,v2).normalize();
+  }
+  
+  void calEdge(){
+    this.edges[0] = PVector.sub(this.vertices[1], this.vertices[0]).copy();
+    this.edges[1] = PVector.sub(this.vertices[2], this.vertices[1]).copy();
+    this.edges[2] = PVector.sub(this.vertices[0], this.vertices[2]).copy();
   }
 
   void setVectors(PVector[] newVertices, PVector[] newNormals) {
@@ -23,8 +46,16 @@ class Triangle {
       vertices[j] = newVertices[j].copy();
       vertexNormals[j] = newNormals[j].copy();
     }
-    updateAll();
+    updateAll(true);
   }
+  
+   void setVectors(PVector[] newVertices) {
+    for (int j=0; j<Triangle.NUM_VERTICES; j++) {
+      vertices[j] = newVertices[j].copy();
+    }
+    updateAll(false);
+  }
+  
 }
 
 /*
