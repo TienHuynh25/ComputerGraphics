@@ -99,17 +99,19 @@ Use the projected vertices to draw the 2D triangle on the raster.
  */
 void draw2DTriangle(Triangle t) {
   //this.vertexNormals[j];
-  final color BLUE = color(0.5f, 1f, 0.9f);
   PVector[] vertices = new PVector[Triangle.NUM_VERTICES];
   
   vertices = projectTriangle(t);
   if(vertices ==  null){return;}
   if(!backFaceCull(t)){return;}
   
-  setColor(BLUE);
-  bresenhamLine(int(vertices[0].x),int(vertices[0].y),int(vertices[1].x), int(vertices[1].y));
-  bresenhamLine(int(vertices[1].x),int(vertices[1].y),int(vertices[2].x), int(vertices[2].y));
-  bresenhamLine(int(vertices[2].x),int(vertices[2].y),int(vertices[0].x), int(vertices[0].y));
+  fillTriangle(t);
+  setColor(OUTLINE_COLOR);
+  if(doOutline){
+    bresenhamLine(int(vertices[0].x),int(vertices[0].y),int(vertices[1].x), int(vertices[1].y));
+    bresenhamLine(int(vertices[1].x),int(vertices[1].y),int(vertices[2].x), int(vertices[2].y));
+    bresenhamLine(int(vertices[2].x),int(vertices[2].y),int(vertices[0].x), int(vertices[0].y));
+  }
   if(doNormals){drawNormals(t);}
 }
 
@@ -154,9 +156,6 @@ void drawNormals(Triangle t) {
   PVector centerEnd = centerStart.copy();
   centerEnd = centerEnd.add(centerNormal.mult(NORMAL_LENGTH));
   
-  print("\nstartpoints: "+ t.vertices[0].x,t.vertices[0].y,t.vertices[0].z);
-  print("\nendpoints: "+v1Point.x,v1Point.y,v1Point.z);
-  
   vertices = projectTriangle(t);
   v1Point = projectVertex(v1Point);
   v2Point = projectVertex(v2Point);
@@ -164,7 +163,6 @@ void drawNormals(Triangle t) {
   centerStart = projectVertex(centerStart);
   centerEnd = projectVertex(centerEnd);
   
-  print("point: "+vertices[0].x,vertices[0].y,v1Point.x,v1Point.y);
   if(v1Point == null || v2Point == null || v3Point == null){print("null normals");return;}
   
   setColor(VERTEX_NORMAL_COLOR);
@@ -181,12 +179,18 @@ PVector[][] genPoints(int nbInY, int nbInTheta){
   
   for(int j=0; j<=nbInY; j++){
     y = (CYLINDER_HEIGHT/2) - j*(CYLINDER_HEIGHT/nbInY);    
-    indices[j][0] = new PVector(0,y,0);
+    if(y == CYLINDER_HEIGHT/2|| y == -CYLINDER_HEIGHT/2){
+      indices[j][0] = new PVector(0,y,0);
+    }
+    else{
+      indices[j][0] = new PVector(CYLINDER_RADIUS*sin(0f), y, CYLINDER_RADIUS*cos(0f));
+    }
     
     for (int i=0; i<(nbInTheta); i++) {
       theta = TWO_PI*i/nbInTheta;
       indices[j][i+1] = new PVector(CYLINDER_RADIUS*sin(theta), y, CYLINDER_RADIUS*cos(theta));
     }
+
   }
   
   return indices;
@@ -194,7 +198,7 @@ PVector[][] genPoints(int nbInY, int nbInTheta){
 
 Triangle[] genTri(int nbInY, int nbInTheta) {
   PVector[][] indices = genPoints(nbInY, nbInTheta);
-  int total = ( (nbInY+1) * (nbInTheta+1) * 2) + 2 * (nbInTheta+1)+ nbInY+1;
+  int total = ( (nbInY+1) * (nbInTheta+1) * 2) + 2 * (nbInTheta+1);
   Triangle[] triangles = new Triangle[total];
   int current = 0;
 
@@ -218,16 +222,16 @@ Triangle[] genTri(int nbInY, int nbInTheta) {
     current++;
   }
   
-  //fill last slides
-  for (int j = 0; j <= nbInY; j++) {
-      // Add an additional triangle to complete the bottom endcap
-    PVector[] bottomVertices = new PVector[Triangle.NUM_VERTICES];
-    bottomVertices[0] = indices[j][nbInTheta].copy();
-    bottomVertices[1] = indices[j][0].copy();
-    bottomVertices[2] = indices[j][(nbInTheta - 1) % nbInTheta].copy();
-    triangles[current] = new Triangle(bottomVertices);
-    current++;  
-  }
+  ////fill last slides
+  //for (int j = 0; j <= nbInY; j++) {
+  //    // Add an additional triangle to complete the bottom endcap
+  //  PVector[] bottomVertices = new PVector[Triangle.NUM_VERTICES];
+  //  bottomVertices[0] = indices[j][nbInTheta].copy();
+  //  bottomVertices[1] = indices[j][0].copy();
+  //  bottomVertices[2] = indices[j][(nbInTheta - 1) % nbInTheta].copy();
+  //  triangles[current] = new Triangle(bottomVertices);
+  //  current++;  
+  //}
 
   // fill side
   for (int j = 0; j <= nbInY; j++) {
@@ -256,6 +260,34 @@ Fill the 2D triangle on the raster, using a scanline algorithm.
  Modify the raster using setColor() and setPixel() ONLY.
  */
 void fillTriangle(Triangle t) {
+
+  //3d -> 2d
+  PVector[] vertices = projectTriangle(t);
+  // Find the bounding box
+  float xmin = min(vertices[0].x, vertices[1].x, vertices[2].x);
+  float xmax = max(vertices[0].x, vertices[1].x, vertices[2].x);
+  float ymin = min(vertices[0].y, vertices[1].y, vertices[2].y);
+  float ymax = max(vertices[0].y, vertices[1].y, vertices[2].y);
+
+  // Iterate over each scanline within the bounding box
+  for (float y = ymin; y <= ymax; y++) {
+    // Iterate over each pixel in the scanline
+    for (float x = xmin; x <= xmax; x++) {
+      // Check if the current pixel is inside the triangle
+      PVector p = new PVector(x, y);
+      if (inside(p,vertices)) {
+        if(shadingMode == ShadingMode.FLAT){
+            setColor(FLAT_FILL_COLOR);
+            setPixel(p);
+        }
+        else if(shadingMode == ShadingMode.BARYCENTRIC){
+          float[] bary = findBarycentric(p,vertices);
+          setColor(bary[R], bary[G],bary[B]);
+          setPixel(p);
+        }
+      }
+    }
+  }
   
 }
 

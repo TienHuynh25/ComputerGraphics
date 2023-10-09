@@ -35,3 +35,54 @@ boolean isFront(PVector normal){
      if(result > 0){return true;}
      else{return false;}
 }
+
+PVector[] findVector(PVector point, PVector[] vertices){
+    PVector[] p = new PVector[3];
+    p[0] = PVector.sub(point, vertices[0]);
+    p[1] = PVector.sub(point, vertices[1]);   
+    p[2] = PVector.sub(point, vertices[2]);  
+    return p;
+}
+
+float[] findBarycentric(PVector point, PVector[] vertices) {
+    PVector[] p = findVector(point, vertices);
+    float[] a = new float[Triangle.NUM_VERTICES];
+    Triangle t = new Triangle(vertices);
+
+    for (int i = 0; i < 3; i++) {
+        float crossProductZ = crossProduct(p[i], t.edges[i]).z;
+
+        // Check for division by zero
+        if (crossProductZ != 0) {
+            a[i] = crossProductZ / (1.0 / 2.0);
+        } else {
+            // Handle the case where the cross product z component is zero
+            // You might want to set a default value or handle it based on your requirements
+            a[i] = 0.0;
+        }
+    }
+
+    // Sum of a[0], a[1], a[2]
+    float aTotal = a[0] + a[1] + a[2];
+
+    // Normalize the values to get the barycentric coordinates
+    for (int i = 0; i < 3; i++) {
+          a[i] = a[i] / aTotal;
+    }
+    return a;
+}
+
+
+boolean inside(PVector point, PVector[] vertices){
+    PVector[] p = findVector(point,vertices);
+    PVector[] cross = new PVector[Triangle.NUM_VERTICES];
+    Triangle t = new Triangle(vertices);
+    for(int i=0; i<3;i++){
+      cross[i] = crossProduct(p[i], t.edges[i]);   
+    }
+    if( (cross[0].z>0 & cross[1].z>0 & cross[2].z>0) || (cross[0].z<0 & cross[1].z<0 & cross[2].z<0) ){
+      return true;
+    }else{
+      return false;
+    }
+}
